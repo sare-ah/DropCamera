@@ -1,14 +1,13 @@
 #######################################################################################################################
-# Benthic Habitat Mapping Dive Survey Site Locations
-# 
-# Objective:  Create a shapefile for WCTSS SCUBA surveys of NCC & HG
+# Assign tide stations to drop camera deployments
 #
+# Code adapted from example found here:
 # https://www.nceas.ucsb.edu/scicomp/usecases/AssignClosestPointsToPoints
 #
 # Author:     Sarah Davies
 #             Sarah.Davies@dfo-mpo.gc.ca
 #             250-756-7124
-# Date:       December 4, 2017
+# Date:       May 9, 2019
 ######################################################################################################################
 
 # start fresh
@@ -17,27 +16,11 @@ rm(list=ls())
 # Set working directory
 setwd("F:/GIS/SURVEY DATA/2019/DropCameraTideCorrections/Shapefiles")
 
-
-################ Functions #####################################
-################################################################
-
 # Install missing packages and load required packages (if required)
-UsePackages <- function( pkgs, update=FALSE, locn="http://cran.rstudio.com/" ) {
-  # Identify missing (i.e., not yet installed) packages
-  newPkgs <- pkgs[!(pkgs %in% installed.packages( )[, "Package"])]
-  # Install missing packages if required
-  if( length(newPkgs) )  install.packages( newPkgs, repos=locn )
-  # Loop over all packages
-  for( i in 1:length(pkgs) ) {
-    # Load required packages using 'library'
-    eval( parse(text=paste("library(", pkgs[i], ")", sep="")) )
-  }  # End i loop over package names
-  # Update packages if requested
-  if( update ) update.packages( ask=FALSE )
-}  # End UsePackages function
-
-# Make packages available
-UsePackages( pkgs=c("dplyr","maptools", "sf","rgdal","sp","geoR") ) 
+if(!require(dplyr)) install.packages("dplyr")
+if(!require(maptools)) install.packages("maptools")
+if(!require(sf)) install.packages("sf")
+if(!require(rgdal)) install.packages("rgdal")
 
 # List all shp files
 list.files(pattern = "\\.shp$")
@@ -81,17 +64,15 @@ for (i in 1 : nrow(drops))
   closestSiteVec[i] <- which.min(distVec)
 }
 
-# Create the Tide Station Assignment table: merge the tide station point list with the drop cam point list
-# into a five-column table.
-#
+# Create the Tide Station assignment table
 Station <- as(stns[closestSiteVec,]$Sites,"character")
 wTideStns= data.frame(coordinates(drops),drops$DropCamKey,
                         closestSiteVec,minDistVec,Station)
 head(wTideStns)
 str(wTideStns)
 
+# Build a new attribute table the clunky way...
 drops.df <- drops@data
-
 drops_wTideStns <- merge(drops.df, wTideStns, by.x="DropCamKey", by.y="drops.DropCamKey")
 drops_wTideStns <- dplyr::select(drops_wTideStns, -c("closestSiteVec","minDistVec"))
 
@@ -99,14 +80,18 @@ drops_wTideStns <- dplyr::select(drops_wTideStns, -c("closestSiteVec","minDistVe
 coordinates(drops_wTideStns) <- c("coords.x1", "coords.x2") 
 
 # Coordinate reference system (http://spatialreference.org
-crs.geo <- CRS("+proj=aea +lat_1=50 +lat_2=58.5 +lat_0=45 +lon_0=-126 +x_0=1000000 +y_0=0") 
+# BC Albers NAD 83
+proj <- "+proj=aea +lat_1=50 +lat_2=58.5 +lat_0=45 +lon_0=-126 +x_0=1000000 +y_0=0"
+projdefs <- "+datum=NAD83 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+geoCRS <- paste( proj, projdefs, sep=" " )
 
 # define projection
-proj4string(drops_wTideStns) <- crs.geo
+proj4string(drops_wTideStns) <- geoCRS 
 
 # plot 
 plot(drops_wTideStns)
 
+# Save as shp
 filename <- "Drops_wTide_stns"
 writeOGR(drops_wTideStns, dsn=".", layer=filename, driver="ESRI Shapefile", overwrite_layer = TRUE )
 
