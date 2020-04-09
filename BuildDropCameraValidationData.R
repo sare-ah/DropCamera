@@ -16,12 +16,16 @@
 rm(list=ls())
 
 # Set working directory
-setwd("T:/Substrate/DropCam_data")
+#setwd("T:/Substrate/DropCam_data")
+setwd("C:/Users/daviessa/Documents/R/Courses/TESA Spatial Stats 2019/MyData/DropCam")
 
-require(dplyr)
+
+require(tidyverse)
 require(sp)
 require(rgdal)
 require(geoR)
+library(operators)
+library(mapview)
 
 ### Functions ###  
 # Remove rows with NA values in specific columns within a dataframe
@@ -31,8 +35,13 @@ completeFun <- function(data, desiredCols) {
 }
 
 # Read in drop camera data
-myFile <- "T:/DropCamera/AnnotationIn2019/8-DropCam_KS.csv"
+#myFile <- "T:/DropCamera/AnnotationIn2019/8-DropCam_KS.csv"
+myFile <- "8-DropCam_KS.csv"
 dropCam  <- read.csv(myFile,header=TRUE, sep=",", strip.white=T, stringsAsFactors = FALSE) 
+
+# Remove positional errors
+bad <- c(2043,2044,2045,1537,1538,1539,1534,1535,1536,1519,1520,1818,1819,1820,2218,2235,2236,2237,1234,1235,1236,1237)
+dropCam <- dplyr::filter(dropCam, DropCamKey %!in% bad)
 
 # Set records with missing data to NA
 dropCam[dropCam == "."] <- NA
@@ -55,15 +64,16 @@ goodDrops <- dplyr::left_join(goodDrops, sub.cat, by=c("Substrate1", "Substrate2
 summary(goodDrops)
 
 # Subset drop camera data
-goodDrops <- dplyr::select(goodDrops,DropCamKey,Survey,Transect,Lat,Lon,RMSM.cat,RMSM.Nme,Substrate1,Substrate2)
+goodDrops <- dplyr::select(goodDrops,DropCamKey,Survey,Transect,Lat,Lon,RMSM.cat,RMSM.Nme,Substrate1,Substrate2,ActualDepth)
 
 # Build shapefile
+setwd("C:/Users/daviessa/Documents/CURRENT_PROJECTS/Substrate_models/Validation data/DropCamera/from_SpatialDatasets/DropCam_data")
 goodDrops <- completeFun( goodDrops, c("Lon", "Lat") )
 coordinates(goodDrops) <- c("Lon", "Lat")
 
 # Coordinate reference system (http://spatialreference.org
 # WGS 1984
-crs.geo <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ") 
+crs.geo <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
 
 # define projection
 proj4string(goodDrops) <- crs.geo
@@ -81,7 +91,6 @@ filename <- "DropCam_sites4SubstrateModel"
 writeOGR(goodDrops_albers, dsn="./Shapefiles", layer=filename, driver="ESRI Shapefile", overwrite_layer = TRUE )
 cat("Fini!")
 
-
-
-
+write.csv(goodDrops, "goodDrops.csv", row.names = F)
+mapview(goodDrops)
 
