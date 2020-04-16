@@ -42,6 +42,7 @@ dropCam  <- read.csv(myFile,header=TRUE, sep=",", strip.white=T, stringsAsFactor
 # Remove positional errors
 bad <- c(2043,2044,2045,1537,1538,1539,1534,1535,1536,1519,1520,1818,1819,1820,2218,2235,2236,2237,1234,1235,1236,1237)
 dropCam <- dplyr::filter(dropCam, DropCamKey %!in% bad)
+summary(dropCam)
 
 # Set records with missing data to NA
 dropCam[dropCam == "."] <- NA
@@ -56,6 +57,9 @@ dropCam$Lat <- as.numeric( (dropCam$LatDeg) + (dropCam$LatMin/60) )
 # Test for complete cases in specific fields
 goodDrops <- completeFun( dropCam, c("Year","Month","Day","TimeIn","Lat","Lon","ActualDepth","Substrate1") )
 
+# Rename depth field
+goodDrops <- rename(goodDrops, "ObsDp_ft"="ActualDepth")
+
 # Read in substrate category table
 sub.cat <- read.csv( "SubstrateCategories.csv", header=T, sep=",", colClasses = c("integer","character","integer",rep("character",4)))
 
@@ -64,11 +68,18 @@ goodDrops <- dplyr::left_join(goodDrops, sub.cat, by=c("Substrate1", "Substrate2
 summary(goodDrops)
 
 # Subset drop camera data
-goodDrops <- dplyr::select(goodDrops,DropCamKey,Survey,Transect,Lat,Lon,RMSM.cat,RMSM.Nme,Substrate1,Substrate2,ActualDepth)
+goodDrops <- dplyr::select(goodDrops,DropCamKey,Survey,Transect,Lat,Lon,RMSM.cat,RMSM.Nme,Substrate1,Substrate2,ObsDp_ft)
+
+# Convert feet to meters
+goodDrops$ObsDp_ft <- as.numeric(goodDrops$ObsDp_ft)
+goodDrops$ObsDp_m <- goodDrops$ObsDp_ft/3.281
+goodDrops$ObsDp_ft <- NULL
+hist(goodDrops$ObsDp_m)
+summary(goodDrops)
 
 # Build shapefile
 setwd("C:/Users/daviessa/Documents/CURRENT_PROJECTS/Substrate_models/Validation data/DropCamera/from_SpatialDatasets/DropCam_data")
-goodDrops <- completeFun( goodDrops, c("Lon", "Lat") )
+goodDrops <- completeFun( goodDrops, c("Lon", "Lat", "RMSM.cat") )
 coordinates(goodDrops) <- c("Lon", "Lat")
 
 # Coordinate reference system (http://spatialreference.org
@@ -93,4 +104,5 @@ cat("Fini!")
 
 write.csv(goodDrops, "goodDrops.csv", row.names = F)
 mapview(goodDrops)
+summary(goodDrops)
 
